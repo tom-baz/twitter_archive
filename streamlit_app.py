@@ -1,11 +1,3 @@
-import subprocess
-
-subprocess.run(["pip", "install", "streamlit"])
-subprocess.run(["pip", "install", "pandas"])
-subprocess.run(["pip", "install", "selenium"])
-subprocess.run(["pip", "install", "webdriver-manager"])
-subprocess.run(["pip", "install", "openpyxl"])
-
 import streamlit as st
 import pandas as pd
 from selenium import webdriver
