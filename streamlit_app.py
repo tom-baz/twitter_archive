@@ -10,6 +10,12 @@ import time
 import random
 import io
 
+
+from selenium import webdriver
+from webdriver_manager.chrome import ChromeDriverManager
+
+driver = webdriver.Chrome(ChromeDriverManager().install())
+
 def archive_twitter_profile(driver, handle):
     try:
         driver.get("https://archive.is/")
