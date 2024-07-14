@@ -4,11 +4,11 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 import time
 import random
 import io
+import os
 
 def archive_twitter_profile(driver, handle):
     try:
@@ -74,7 +74,12 @@ def main():
         
         df["archived_url"] = ""
 
-        driver = webdriver.Chrome(service=Service(ChromeDriverManager(version="114.0.5735.90").install()))
+        chrome_options = webdriver.ChromeOptions()
+        chrome_options.add_argument('--headless')
+        chrome_options.add_argument('--no-sandbox')
+        chrome_options.add_argument('--disable-dev-shm-usage')
+        
+        driver = webdriver.Chrome(ChromeDriverManager().install(), options=chrome_options)
 
         for index, row in df.iterrows():
             handle = row["handle"]
