@@ -74,7 +74,7 @@ def main():
         
         df["archived_url"] = ""
 
-        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager(version="114.0.5735.90").install()))
 
         for index, row in df.iterrows():
             handle = row["handle"]
