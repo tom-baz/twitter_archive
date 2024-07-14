@@ -4,15 +4,9 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 import time
 import random
-import io
-
-
-
-driver = webdriver.Chrome(ChromeDriverManager().install())
 
 def archive_twitter_profile(driver, handle):
     try:
@@ -43,7 +37,7 @@ def archive_twitter_profile(driver, handle):
                 EC.presence_of_element_located((By.ID, "checkbox"))
             )
             captcha_checkbox.click()
-            input("Please solve the CAPTCHA manually. Press Enter to continue...")
+            input("Please solve the CAPTCHA manually in the browser window. Press Enter to continue...")
         except:
             pass
         
@@ -61,47 +55,54 @@ def archive_twitter_profile(driver, handle):
         return archived_url
     
     except Exception as e:
-        print(f"Error archiving {handle}: {str(e)}")
+        st.write(f"Error archiving {handle}: {str(e)}")
         return None
 
 def main():
-    st.title("Twitter Archive App")
+    st.title("Twitter Handle Archiver")
     
-    uploaded_file = st.file_uploader("Choose an Excel file", type=["xlsx"])
+    uploaded_file = st.file_uploader("Choose an Excel file", type="xlsx")
     
     if uploaded_file is not None:
         df = pd.read_excel(uploaded_file)
-        df["archived_url"] = ""
-
-        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
-
-        for index, row in df.iterrows():
-            handle = row["handle"]
-            st.write(f"Processing handle: {handle}")
-
-            archived_url = archive_twitter_profile(driver, handle)
-
-            if archived_url:
-                df.at[index, "archived_url"] = archived_url
-                st.write(f"Archived URL for {handle}: {archived_url}")
-
-            wait_time = random.uniform(2, 5)
-            st.write(f"Waiting for {wait_time:.2f} seconds before processing the next handle...")
-            time.sleep(wait_time)
-
-        driver.quit()
-
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df.to_excel(writer, index=False)
-        output.seek(0)
-
-        st.download_button(
-            label="Download Updated Excel",
-            data=output,
-            file_name='handles_archived.xlsx',
-            mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
-
-if __name__ == '__main__':
+        st.write("Uploaded Excel file:")
+        st.write(df)
+        
+        if 'handle' in df.columns:
+            handles = df['handle'].tolist()
+            st.write("Processing handles...")
+            
+            # Set up the webdriver
+            driver = webdriver.Chrome(ChromeDriverManager().install())
+            
+            archived_urls = []
+            for handle in handles:
+                st.write(f"Processing handle: {handle}")
+                archived_url = archive_twitter_profile(driver, handle)
+                archived_urls.append(archived_url)
+                if archived_url:
+                    st.write(f"Archived URL for {handle}: {archived_url}")
+                wait_time = random.uniform(2, 5)
+                st.write(f"Waiting for {wait_time:.2f} seconds before processing the next handle...")
+                time.sleep(wait_time)
+            
+            driver.quit()
+            
+            df['archived_url'] = archived_urls
+            
+            st.write("Processed DataFrame with Archived URLs:")
+            st.write(df)
+            
+            output_file = "handles_archived.xlsx"
+            df.to_excel(output_file, index=False)
+            st.download_button(
+                label="Download Excel file with archived URLs",
+                data=open(output_file, "rb").read(),
+                file_name=output_file,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+        else:
+            st.error("The Excel file must contain a column named 'handle'.")
+    
+if __name__ == "__main__":
     main()
