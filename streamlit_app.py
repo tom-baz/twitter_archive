@@ -8,6 +8,11 @@ from selenium.webdriver.firefox.options import Options
 import time
 import random
 import io
+import logging
+
+# Set up logging
+logging.basicConfig(filename='app.log', level=logging.INFO,
+                    format='%(asctime)s - %(levelname)s - %(message)s')
 
 def create_driver(headless=True):
     options = Options()
@@ -69,7 +74,7 @@ def archive_twitter_profile(driver, handle):
         return archived_url
     
     except Exception as e:
-        print(f"Error archiving {handle}: {str(e)}")
+        logging.error(f"Error archiving {handle}: {str(e)}")
         return None
 
 def main():
@@ -92,6 +97,9 @@ def main():
             if archived_url:
                 df.at[index, "archived_url"] = archived_url
                 st.write(f"Archived URL for {handle}: {archived_url}")
+            else:
+                st.write(f"Failed to archive {handle}")
+                logging.error(f"Failed to archive {handle}")
 
             wait_time = random.uniform(2, 5)
             st.write(f"Waiting for {wait_time:.2f} seconds before processing the next handle...")
