@@ -4,11 +4,18 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.firefox.service import Service
+from selenium.webdriver.firefox.options import Options
 import time
 import random
 import io
-import os
+
+def create_driver():
+    options = Options()
+    options.add_argument("--headless")  # Run Firefox in headless mode
+    service = Service(executable_path="/home/appuser/.geckodriver/geckodriver")
+    driver = webdriver.Firefox(service=service, options=options)
+    return driver
 
 def archive_twitter_profile(driver, handle):
     try:
@@ -39,7 +46,7 @@ def archive_twitter_profile(driver, handle):
                 EC.presence_of_element_located((By.ID, "checkbox"))
             )
             captcha_checkbox.click()
-            input("Please solve the CAPTCHA manually in the browser window. Press Enter to continue...")
+            input("Please solve the CAPTCHA manually. Press Enter to continue...")
         except:
             pass
         
@@ -57,7 +64,7 @@ def archive_twitter_profile(driver, handle):
         return archived_url
     
     except Exception as e:
-        st.write(f"Error archiving {handle}: {str(e)}")
+        print(f"Error archiving {handle}: {str(e)}")
         return None
 
 def main():
@@ -67,19 +74,9 @@ def main():
     
     if uploaded_file is not None:
         df = pd.read_excel(uploaded_file)
-        
-        if 'handle' not in df.columns:
-            st.error("The Excel file must contain a column named 'handle'.")
-            return
-        
         df["archived_url"] = ""
 
-        chrome_options = webdriver.ChromeOptions()
-        chrome_options.add_argument('--headless')
-        chrome_options.add_argument('--no-sandbox')
-        chrome_options.add_argument('--disable-dev-shm-usage')
-        
-        driver = webdriver.Chrome(ChromeDriverManager().install(), options=chrome_options)
+        driver = create_driver()
 
         for index, row in df.iterrows():
             handle = row["handle"]
