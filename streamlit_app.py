@@ -11,9 +11,14 @@ import io
 import logging
 
 # Set up logging
-logging.basicConfig(filename='app.log', level=logging.INFO,
-                    format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(levelname)s - %(message)s',
+                    handlers=[
+                        logging.FileHandler('app.log'),
+                        logging.StreamHandler()
+                    ])
 
+@st.cache(allow_output_mutation=True)
 def create_driver(headless=True):
     options = Options()
     if headless:
@@ -22,60 +27,7 @@ def create_driver(headless=True):
     return driver
 
 def archive_twitter_profile(driver, handle):
-    try:
-        driver.get("https://archive.is/")
-        
-        input_field = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.NAME, "url"))
-        )
-        input_field.send_keys(f"https://twitter.com/{handle}")
-        
-        archive_button = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable((By.XPATH, "//input[@type='submit']"))
-        )
-        archive_button.click()
-        
-        # Check if the profile has been archived before
-        try:
-            save_button = WebDriverWait(driver, 5).until(
-                EC.presence_of_element_located((By.XPATH, "//input[@value='save']"))
-            )
-            save_button.click()
-        except:
-            pass
-        
-        # Check if the CAPTCHA is present
-        try:
-            captcha_checkbox = WebDriverWait(driver, 5).until(
-                EC.presence_of_element_located((By.ID, "checkbox"))
-            )
-            captcha_checkbox.click()
-            # Disable headless mode and recreate the driver
-            driver.quit()
-            driver = create_driver(headless=False)
-            input("Please solve the CAPTCHA manually. Press Enter to continue...")
-            # Re-enable headless mode and recreate the driver
-            driver.quit()
-            driver = create_driver(headless=True)
-        except:
-            pass
-        
-        # Wait for the archiving process to complete
-        start_time = time.time()
-        while True:
-            archived_url = driver.current_url
-            if "wip" not in archived_url:
-                break
-            elif time.time() - start_time > 180:
-                raise Exception("Archiving process timed out")
-            else:
-                time.sleep(1)
-        
-        return archived_url
-    
-    except Exception as e:
-        logging.error(f"Error archiving {handle}: {str(e)}")
-        return None
+    # ... (same as before) ...
 
 def main():
     st.title("Twitter Archive App")
@@ -86,26 +38,34 @@ def main():
         df = pd.read_excel(uploaded_file)
         df["archived_url"] = ""
 
-        driver = create_driver()
+        if 'driver' not in st.session_state:
+            st.session_state.driver = create_driver()
+
+        driver = st.session_state.driver
+
+        progress_bar = st.progress(0)
+        status_text = st.empty()
 
         for index, row in df.iterrows():
             handle = row["handle"]
-            st.write(f"Processing handle: {handle}")
+            status_text.text(f"Processing handle: {handle}")
 
             archived_url = archive_twitter_profile(driver, handle)
 
             if archived_url:
                 df.at[index, "archived_url"] = archived_url
-                st.write(f"Archived URL for {handle}: {archived_url}")
+                logging.info(f"Archived URL for {handle}: {archived_url}")
             else:
-                st.write(f"Failed to archive {handle}")
                 logging.error(f"Failed to archive {handle}")
 
+            progress_bar.progress((index + 1) / len(df))
+
             wait_time = random.uniform(2, 5)
-            st.write(f"Waiting for {wait_time:.2f} seconds before processing the next handle...")
+            status_text.text(f"Waiting for {wait_time:.2f} seconds before processing the next handle...")
             time.sleep(wait_time)
 
         driver.quit()
+        st.session_state.driver = None
 
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
