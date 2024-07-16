@@ -4,17 +4,16 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.firefox.service import Service
 from selenium.webdriver.firefox.options import Options
 import time
 import random
 import io
 
-def create_driver():
+def create_driver(headless=True):
     options = Options()
-    options.add_argument("--headless")  # Run Firefox in headless mode
-    service = Service(executable_path="/home/appuser/.geckodriver/geckodriver")
-    driver = webdriver.Firefox(service=service, options=options)
+    if headless:
+        options.add_argument("--headless")  # Run Firefox in headless mode
+    driver = webdriver.Firefox(options=options)
     return driver
 
 def archive_twitter_profile(driver, handle):
@@ -46,7 +45,13 @@ def archive_twitter_profile(driver, handle):
                 EC.presence_of_element_located((By.ID, "checkbox"))
             )
             captcha_checkbox.click()
+            # Disable headless mode and recreate the driver
+            driver.quit()
+            driver = create_driver(headless=False)
             input("Please solve the CAPTCHA manually. Press Enter to continue...")
+            # Re-enable headless mode and recreate the driver
+            driver.quit()
+            driver = create_driver(headless=True)
         except:
             pass
         
