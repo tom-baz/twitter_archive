@@ -19,7 +19,10 @@ logging.basicConfig(level=logging.INFO,
 
 class TwitterArchiver(BaseCase):
     def setUp(self, headless=True):
-        super().setUp(browser='firefox', headless=headless)
+        super().setUp()
+        if headless:
+            self.headless()
+        self.browser = "firefox"
 
     def archive_twitter_profile(self, handle):
         try:
