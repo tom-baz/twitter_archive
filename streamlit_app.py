@@ -4,7 +4,6 @@ from seleniumbase import BaseCase
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.firefox.options import Options
 import time
 import random
 import io
@@ -20,80 +19,68 @@ logging.basicConfig(level=logging.INFO,
 
 class TwitterArchiver(BaseCase):
     def setUp(self, headless=True):
-        options = Options()
-        if headless:
-            options.add_argument("--headless")  # Run Firefox in headless mode
-        super().setUp(firefox_options=options)
+        super().setUp(browser='firefox', headless=headless)
 
-def archive_twitter_profile(driver, handle):
-    try:
-        logging.info(f"Navigating to https://archive.is/ for {handle}")
-        driver.get("https://archive.is/")
-        
-        logging.info(f"Locating input field for {handle}")
-        input_field = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.NAME, "url"))
-        )
-        logging.info(f"Filling in input field with URL for {handle}")
-        input_field.send_keys(f"https://twitter.com/{handle}")
-        
-        logging.info(f"Locating archive button for {handle}")
-        archive_button = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable((By.XPATH, "//input[@type='submit']"))
-        )
-        logging.info(f"Clicking archive button for {handle}")
-        archive_button.click()
-        
-        # Check if the profile has been archived before
+    def archive_twitter_profile(self, handle):
         try:
-            logging.info(f"Checking if {handle} has been archived before")
-            save_button = WebDriverWait(driver, 5).until(
-                EC.presence_of_element_located((By.XPATH, "//input[@value='save']"))
-            )
-            logging.info(f"{handle} has been archived before, clicking save button")
-            save_button.click()
-        except:
-            logging.info(f"{handle} has not been archived before")
-            pass
+            logging.info(f"Navigating to https://archive.is/ for {handle}")
+            self.open("https://archive.is/")
+            
+            logging.info(f"Locating input field for {handle}")
+            input_field = self.wait_for_element((By.NAME, "url"))
+            logging.info(f"Filling in input field with URL for {handle}")
+            self.update_text(input_field, f"https://twitter.com/{handle}")
+            
+            logging.info(f"Locating archive button for {handle}")
+            archive_button = self.wait_for_element((By.XPATH, "//input[@type='submit']"))
+            logging.info(f"Clicking archive button for {handle}")
+            self.click(archive_button)
+            
+            # Check if the profile has been archived before
+            try:
+                logging.info(f"Checking if {handle} has been archived before")
+                save_button = self.wait_for_element((By.XPATH, "//input[@value='save']"), timeout=5)
+                logging.info(f"{handle} has been archived before, clicking save button")
+                self.click(save_button)
+            except:
+                logging.info(f"{handle} has not been archived before")
+                pass
+            
+            # Check if the CAPTCHA is present
+            try:
+                logging.info(f"Checking if CAPTCHA is present for {handle}")
+                captcha_checkbox = self.wait_for_element((By.ID, "checkbox"), timeout=5)
+                logging.info(f"CAPTCHA is present for {handle}, clicking checkbox")
+                self.click(captcha_checkbox)
+                # Disable headless mode and recreate the driver
+                self.tearDown()
+                self.setUp(headless=False)
+                input("Please solve the CAPTCHA manually. Press Enter to continue...")
+                # Re-enable headless mode and recreate the driver
+                self.tearDown()
+                self.setUp(headless=True)
+            except:
+                logging.info(f"CAPTCHA is not present for {handle}")
+                pass
+            
+            # Wait for the archiving process to complete
+            start_time = time.time()
+            while True:
+                archived_url = self.get_current_url()
+                if "wip" not in archived_url:
+                    logging.info(f"Archiving process completed for {handle}")
+                    break
+                elif time.time() - start_time > 180:
+                    logging.error(f"Archiving process timed out for {handle}")
+                    raise Exception("Archiving process timed out")
+                else:
+                    time.sleep(1)
+            
+            return archived_url
         
-        # Check if the CAPTCHA is present
-        try:
-            logging.info(f"Checking if CAPTCHA is present for {handle}")
-            captcha_checkbox = WebDriverWait(driver, 5).until(
-                EC.presence_of_element_located((By.ID, "checkbox"))
-            )
-            logging.info(f"CAPTCHA is present for {handle}, clicking checkbox")
-            captcha_checkbox.click()
-            # Disable headless mode and recreate the driver
-            driver.quit()
-            driver = create_driver(headless=False)
-            input("Please solve the CAPTCHA manually. Press Enter to continue...")
-            # Re-enable headless mode and recreate the driver
-            driver.quit()
-            driver = create_driver(headless=True)
-        except:
-            logging.info(f"CAPTCHA is not present for {handle}")
-            pass
-        
-        # Wait for the archiving process to complete
-        start_time = time.time()
-        while True:
-            archived_url = driver.current_url
-            if "wip" not in archived_url:
-                logging.info(f"Archiving process completed for {handle}")
-                break
-            elif time.time() - start_time > 180:
-                logging.error(f"Archiving process timed out for {handle}")
-                raise Exception("Archiving process timed out")
-            else:
-                time.sleep(1)
-        
-        return archived_url
-    
-    except Exception as e:
-        logging.error(f"Error archiving {handle}: {str(e)}")
-        return None
-
+        except Exception as e:
+            logging.error(f"Error archiving {handle}: {str(e)}")
+            return None
 
 @st.cache(allow_output_mutation=True)
 def create_archiver(headless=True):
