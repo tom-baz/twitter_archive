@@ -27,7 +27,73 @@ def create_driver(headless=True):
     return driver
 
 def archive_twitter_profile(driver, handle):
-    # ... (same as before) ...
+    try:
+        logging.info(f"Navigating to https://archive.is/ for {handle}")
+        driver.get("https://archive.is/")
+        
+        logging.info(f"Locating input field for {handle}")
+        input_field = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.NAME, "url"))
+        )
+        logging.info(f"Filling in input field with URL for {handle}")
+        input_field.send_keys(f"https://twitter.com/{handle}")
+        
+        logging.info(f"Locating archive button for {handle}")
+        archive_button = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.XPATH, "//input[@type='submit']"))
+        )
+        logging.info(f"Clicking archive button for {handle}")
+        archive_button.click()
+        
+        # Check if the profile has been archived before
+        try:
+            logging.info(f"Checking if {handle} has been archived before")
+            save_button = WebDriverWait(driver, 5).until(
+                EC.presence_of_element_located((By.XPATH, "//input[@value='save']"))
+            )
+            logging.info(f"{handle} has been archived before, clicking save button")
+            save_button.click()
+        except:
+            logging.info(f"{handle} has not been archived before")
+            pass
+        
+        # Check if the CAPTCHA is present
+        try:
+            logging.info(f"Checking if CAPTCHA is present for {handle}")
+            captcha_checkbox = WebDriverWait(driver, 5).until(
+                EC.presence_of_element_located((By.ID, "checkbox"))
+            )
+            logging.info(f"CAPTCHA is present for {handle}, clicking checkbox")
+            captcha_checkbox.click()
+            # Disable headless mode and recreate the driver
+            driver.quit()
+            driver = create_driver(headless=False)
+            input("Please solve the CAPTCHA manually. Press Enter to continue...")
+            # Re-enable headless mode and recreate the driver
+            driver.quit()
+            driver = create_driver(headless=True)
+        except:
+            logging.info(f"CAPTCHA is not present for {handle}")
+            pass
+        
+        # Wait for the archiving process to complete
+        start_time = time.time()
+        while True:
+            archived_url = driver.current_url
+            if "wip" not in archived_url:
+                logging.info(f"Archiving process completed for {handle}")
+                break
+            elif time.time() - start_time > 180:
+                logging.error(f"Archiving process timed out for {handle}")
+                raise Exception("Archiving process timed out")
+            else:
+                time.sleep(1)
+        
+        return archived_url
+    
+    except Exception as e:
+        logging.error(f"Error archiving {handle}: {str(e)}")
+        return None
 
 def main():
     st.title("Twitter Archive App")
