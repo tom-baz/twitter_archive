@@ -19,9 +19,11 @@ logging.basicConfig(level=logging.INFO,
                     ])
 
 class TwitterArchiver(BaseCase):
-    def __init__(self, headless=True):
-        super().__init__(headless=headless)
-        self.driver = self.get_driver()
+    def setUp(self, headless=True):
+        options = Options()
+        if headless:
+            options.add_argument("--headless")  # Run Firefox in headless mode
+        super().setUp(firefox_options=options)
 
 def archive_twitter_profile(driver, handle):
     try:
@@ -92,9 +94,12 @@ def archive_twitter_profile(driver, handle):
         logging.error(f"Error archiving {handle}: {str(e)}")
         return None
 
+
 @st.cache(allow_output_mutation=True)
 def create_archiver(headless=True):
-    return TwitterArchiver(headless=headless)
+    archiver = TwitterArchiver()
+    archiver.setUp(headless=headless)
+    return archiver
 
 def main():
     st.title("Twitter Archive App")
@@ -131,7 +136,7 @@ def main():
             status_text.text(f"Waiting for {wait_time:.2f} seconds before processing the next handle...")
             time.sleep(wait_time)
 
-        archiver.quit()
+        archiver.tearDown()
         st.session_state.archiver = None
 
         output = io.BytesIO()
