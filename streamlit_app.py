@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from selenium import webdriver
+from seleniumbase import BaseCase
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -18,13 +18,10 @@ logging.basicConfig(level=logging.INFO,
                         logging.StreamHandler()
                     ])
 
-@st.cache(allow_output_mutation=True)
-def create_driver(headless=True):
-    options = Options()
-    if headless:
-        options.add_argument("--headless")  # Run Firefox in headless mode
-    driver = webdriver.Firefox(options=options)
-    return driver
+class TwitterArchiver(BaseCase):
+    def __init__(self, headless=True):
+        super().__init__(headless=headless)
+        self.driver = self.get_driver()
 
 def archive_twitter_profile(driver, handle):
     try:
@@ -95,6 +92,10 @@ def archive_twitter_profile(driver, handle):
         logging.error(f"Error archiving {handle}: {str(e)}")
         return None
 
+@st.cache(allow_output_mutation=True)
+def create_archiver(headless=True):
+    return TwitterArchiver(headless=headless)
+
 def main():
     st.title("Twitter Archive App")
     
@@ -104,10 +105,10 @@ def main():
         df = pd.read_excel(uploaded_file)
         df["archived_url"] = ""
 
-        if 'driver' not in st.session_state:
-            st.session_state.driver = create_driver()
+        if 'archiver' not in st.session_state:
+            st.session_state.archiver = create_archiver()
 
-        driver = st.session_state.driver
+        archiver = st.session_state.archiver
 
         progress_bar = st.progress(0)
         status_text = st.empty()
@@ -116,7 +117,7 @@ def main():
             handle = row["handle"]
             status_text.text(f"Processing handle: {handle}")
 
-            archived_url = archive_twitter_profile(driver, handle)
+            archived_url = archiver.archive_twitter_profile(handle)
 
             if archived_url:
                 df.at[index, "archived_url"] = archived_url
@@ -130,8 +131,8 @@ def main():
             status_text.text(f"Waiting for {wait_time:.2f} seconds before processing the next handle...")
             time.sleep(wait_time)
 
-        driver.quit()
-        st.session_state.driver = None
+        archiver.quit()
+        st.session_state.archiver = None
 
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
