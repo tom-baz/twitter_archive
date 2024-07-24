@@ -9,10 +9,27 @@ import time
 import random
 import io
 import logging
+import os
+import requests
+import tarfile
 
 # Set up logging
 logging.basicConfig(filename='app.log', level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
+
+def setup_geckodriver():
+    url = "https://github.com/mozilla/geckodriver/releases/latest/download/geckodriver-v0.32.0-linux64.tar.gz"
+    response = requests.get(url)
+    with open("geckodriver.tar.gz", "wb") as file:
+        file.write(response.content)
+    
+    with tarfile.open("geckodriver.tar.gz", "r:gz") as tar:
+        tar.extractall()
+    
+    os.chmod("geckodriver", 0o755)
+    os.rename("geckodriver", "/usr/local/bin/geckodriver")
+
+setup_geckodriver()
 
 def create_driver(headless=True):
     options = Options()
