@@ -4,7 +4,6 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
 import time
 import random
 import io
@@ -79,7 +78,9 @@ def main():
         chrome_options.add_argument('--no-sandbox')
         chrome_options.add_argument('--disable-dev-shm-usage')
         
-        driver = webdriver.Chrome(ChromeDriverManager().install(), options=chrome_options)
+        # Set the path to the downloaded ChromeDriver
+        chrome_path = '/usr/bin/chromedriver'  # Path to chromedriver
+        driver = webdriver.Chrome(executable_path=chrome_path, options=chrome_options)
 
         for index, row in df.iterrows():
             handle = row["handle"]
