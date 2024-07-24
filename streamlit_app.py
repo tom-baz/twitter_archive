@@ -1,42 +1,28 @@
 import streamlit as st
 import pandas as pd
-from selenium import webdriver
+from seleniumbase import BaseCase
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.firefox.options import Options
 import time
 import random
 import io
 import logging
-import os
-import requests
-import tarfile
 
 # Set up logging
-logging.basicConfig(filename='app.log', level=logging.INFO,
-                    format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(levelname)s - %(message)s',
+                    handlers=[
+                        logging.FileHandler('app.log'),
+                        logging.StreamHandler()
+                    ])
 
-def setup_geckodriver():
-    url = "https://github.com/mozilla/geckodriver/releases/latest/download/geckodriver-v0.32.0-linux64.tar.gz"
-    response = requests.get(url)
-    with open("geckodriver.tar.gz", "wb") as file:
-        file.write(response.content)
-    
-    with tarfile.open("geckodriver.tar.gz", "r:gz") as tar:
-        tar.extractall()
-    
-    os.chmod("geckodriver", 0o755)
-    os.rename("geckodriver", "/usr/local/bin/geckodriver")
-
-setup_geckodriver()
-
-def create_driver(headless=True):
-    options = Options()
-    if headless:
-        options.add_argument("--headless")  # Run Firefox in headless mode
-    driver = webdriver.Firefox(options=options)
-    return driver
+class TwitterArchiver(BaseCase):
+    def setUp(self, headless=True):
+        super().setUp()
+        if headless:
+            self.headless()
+        self.browser = "firefox"
 
 def archive_twitter_profile(driver, handle):
     try:
@@ -107,6 +93,13 @@ def archive_twitter_profile(driver, handle):
         logging.error(f"Error archiving {handle}: {str(e)}")
         return None
 
+
+@st.cache(allow_output_mutation=True)
+def create_archiver(headless=True):
+    archiver = TwitterArchiver()
+    archiver.setUp(headless=headless)
+    return archiver
+
 def main():
     st.title("Twitter Archive App")
     
@@ -114,30 +107,36 @@ def main():
     
     if uploaded_file is not None:
         df = pd.read_excel(uploaded_file)
-        
-        if 'handle' not in df.columns:
-            st.error("The Excel file must contain a column named 'handle'.")
-            return
-        
         df["archived_url"] = ""
 
-        driver = create_driver()
+        if 'archiver' not in st.session_state:
+            st.session_state.archiver = create_archiver()
+
+        archiver = st.session_state.archiver
+
+        progress_bar = st.progress(0)
+        status_text = st.empty()
 
         for index, row in df.iterrows():
             handle = row["handle"]
-            st.write(f"Processing handle: {handle}")
+            status_text.text(f"Processing handle: {handle}")
 
-            archived_url = archive_twitter_profile(driver, handle)
+            archived_url = archiver.archive_twitter_profile(handle)
 
             if archived_url:
                 df.at[index, "archived_url"] = archived_url
-                st.write(f"Archived URL for {handle}: {archived_url}")
+                logging.info(f"Archived URL for {handle}: {archived_url}")
+            else:
+                logging.error(f"Failed to archive {handle}")
+
+            progress_bar.progress((index + 1) / len(df))
 
             wait_time = random.uniform(2, 5)
-            st.write(f"Waiting for {wait_time:.2f} seconds before processing the next handle...")
+            status_text.text(f"Waiting for {wait_time:.2f} seconds before processing the next handle...")
             time.sleep(wait_time)
 
-        driver.quit()
+        archiver.tearDown()
+        st.session_state.archiver = None
 
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
