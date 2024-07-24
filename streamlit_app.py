@@ -4,42 +4,71 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.firefox.options import Options
 import time
 import random
 import io
+import logging
+
+# Set up logging
+logging.basicConfig(filename='app.log', level=logging.INFO,
+                    format='%(asctime)s - %(levelname)s - %(message)s')
+
+def create_driver(headless=True):
+    options = Options()
+    if headless:
+        options.add_argument("--headless")  # Run Firefox in headless mode
+    driver = webdriver.Firefox(options=options)
+    return driver
 
 def archive_twitter_profile(driver, handle):
     try:
+        logging.info(f"Navigating to https://archive.is/ for {handle}")
         driver.get("https://archive.is/")
         
+        logging.info(f"Locating input field for {handle}")
         input_field = WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.NAME, "url"))
         )
+        logging.info(f"Filling in input field with URL for {handle}")
         input_field.send_keys(f"https://twitter.com/{handle}")
         
+        logging.info(f"Locating archive button for {handle}")
         archive_button = WebDriverWait(driver, 10).until(
             EC.element_to_be_clickable((By.XPATH, "//input[@type='submit']"))
         )
+        logging.info(f"Clicking archive button for {handle}")
         archive_button.click()
         
         # Check if the profile has been archived before
         try:
+            logging.info(f"Checking if {handle} has been archived before")
             save_button = WebDriverWait(driver, 5).until(
                 EC.presence_of_element_located((By.XPATH, "//input[@value='save']"))
             )
+            logging.info(f"{handle} has been archived before, clicking save button")
             save_button.click()
         except:
+            logging.info(f"{handle} has not been archived before")
             pass
         
         # Check if the CAPTCHA is present
         try:
+            logging.info(f"Checking if CAPTCHA is present for {handle}")
             captcha_checkbox = WebDriverWait(driver, 5).until(
                 EC.presence_of_element_located((By.ID, "checkbox"))
             )
+            logging.info(f"CAPTCHA is present for {handle}, clicking checkbox")
             captcha_checkbox.click()
-            input("Please solve the CAPTCHA manually in the browser window. Press Enter to continue...")
+            # Disable headless mode and recreate the driver
+            driver.quit()
+            driver = create_driver(headless=False)
+            input("Please solve the CAPTCHA manually. Press Enter to continue...")
+            # Re-enable headless mode and recreate the driver
+            driver.quit()
+            driver = create_driver(headless=True)
         except:
+            logging.info(f"CAPTCHA is not present for {handle}")
             pass
         
         # Wait for the archiving process to complete
@@ -47,8 +76,10 @@ def archive_twitter_profile(driver, handle):
         while True:
             archived_url = driver.current_url
             if "wip" not in archived_url:
+                logging.info(f"Archiving process completed for {handle}")
                 break
             elif time.time() - start_time > 180:
+                logging.error(f"Archiving process timed out for {handle}")
                 raise Exception("Archiving process timed out")
             else:
                 time.sleep(1)
@@ -56,7 +87,7 @@ def archive_twitter_profile(driver, handle):
         return archived_url
     
     except Exception as e:
-        st.write(f"Error archiving {handle}: {str(e)}")
+        logging.error(f"Error archiving {handle}: {str(e)}")
         return None
 
 def main():
@@ -73,13 +104,7 @@ def main():
         
         df["archived_url"] = ""
 
-        chrome_options = webdriver.ChromeOptions()
-        chrome_options.add_argument('--headless')
-        chrome_options.add_argument('--no-sandbox')
-        chrome_options.add_argument('--disable-dev-shm-usage')
-        
-        service = Service('/usr/bin/chromedriver')  # Path to chromedriver
-        driver = webdriver.Chrome(service=service, options=chrome_options)
+        driver = create_driver()
 
         for index, row in df.iterrows():
             handle = row["handle"]
